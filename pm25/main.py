@@ -315,7 +315,7 @@ def get_config_dict(config_file="config.ini"):
 if __name__ == "__main__":
     raw_dir = Path(os.getcwd(), "input_data")
     output_dir = Path(os.getcwd(), "output_data")
-    box_config_path = "box_login_config.json"
+    # box_config_path = "box_login_config.json"
 
     year_list = range(1998, 2021)
 
