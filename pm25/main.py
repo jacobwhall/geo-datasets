@@ -21,11 +21,6 @@ sys.path.insert(1, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath
 
 from dataset import Dataset
                 
-def download_item(item, dst_path):
-
-    with open(dst_path, "wb") as dst:
-        i.download_to(dst)
-
 
 def export_raster(data, path, meta, **kwargs):
     """
@@ -102,7 +97,7 @@ class PM25(Dataset):
         self.filename_template = "V5GL02.HybridPM25.Global.{YEAR}{FIRST_MONTH}-{YEAR}{LAST_MONTH}"
 
 
-    def tasks_from_folder(self,
+    def download_folder(self,
                        box_folder,
                        dst_folder,
                        skip_existing=True,
@@ -145,18 +140,18 @@ class PM25(Dataset):
                             logger.info(f"File already downloaded, skipping: {dst_file}")
                             continue
                     else:
-                        logger.info(f"Queued for download: {dst_file}")
-                        task_list.append((i, dst_folder / i.name))
+                        logger.info(f"Downloading: {dst_file}")
+                        with open(dst_folder / i.name, "wb") as dst:
+                            i.download_to(dst)
+
 
                 else:
                     logger.debug(f"Skipping {i.name}, year not in range for this run")
             else:
                 raise Exception(f"Unable to parse file name: {i.name}")
 
-        return task_list
 
-
-    def prepare_download(self, **kwargs):
+    def download(self, **kwargs):
         """
         Generates a task list of downloads from the Box shared folder for this dataset.
         """
@@ -193,12 +188,10 @@ class PM25(Dataset):
             raise KeyError("Could not find directory \"Global/Monthly\" in shared Box folder")
 
         # generate Annual tasks
-        annual_tasks = self.tasks_from_folder(annual_item, "input_data/Annual/", **kwargs)
+        self.download_folder(annual_item, "input_data/Annual/", **kwargs)
 
         # generate Monthly tasks
-        monthly_tasks = self.tasks_from_folder(monthly_item, "input_data/Monthly/", **kwargs)
-
-        return annual_tasks + monthly_tasks
+        self.download_folder(monthly_item, "input_data/Monthly/", **kwargs)
 
 
     def convert_file(self, input_path, output_path):
@@ -282,9 +275,8 @@ class PM25(Dataset):
 
         logger = self.get_logger()
 
-        logger.info("Downloading / Verifying Data")
-        download_tasks = self.prepare_download(skip_existing=self.skip_existing_downloads, verify_existing=self.verify_existing_downloads)
-        self.run_tasks(download_item, download_tasks)
+        logger.info("Downloading Data")
+        self.download(skip_existing=self.skip_existing_downloads, verify_existing=self.verify_existing_downloads)
 
         logger.info("Generating Task List")
         conv_flist = self.build_process_list()
