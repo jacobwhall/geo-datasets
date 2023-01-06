@@ -21,6 +21,11 @@ sys.path.insert(1, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath
 
 from dataset import Dataset
                 
+def download_item(item, dst_path):
+
+    with open(dst_path, "wb") as dst:
+        i.download_to(dst)
+
 
 def export_raster(data, path, meta, **kwargs):
     """
@@ -96,18 +101,15 @@ class PM25(Dataset):
 
         self.filename_template = "V5GL02.HybridPM25.Global.{YEAR}{FIRST_MONTH}-{YEAR}{LAST_MONTH}"
 
-    def download_item(self, item, dst):
 
-        with open(dst_file, "wb") as dst:
-            i.download_to(dst)
-
-    def download_folder(self,
+    def tasks_from_folder(self,
                        box_folder,
                        dst_folder,
                        skip_existing=True,
                        verify_existing=True):
         """
-        Downloads the contents of a Box folder to a dst_folder
+        Generates a task list for download_item from a Box
+        folder
 
         skip_existing will skip file names that already exist
         in dst_folder verify_existing will verify the hashes
@@ -144,21 +146,19 @@ class PM25(Dataset):
                             continue
                     else:
                         logger.info(f"Queued for download: {dst_file}")
-                        task_list.append([i, dst_folder / i.name])
+                        task_list.append((i, dst_folder / i.name))
 
                 else:
                     logger.debug(f"Skipping {i.name}, year not in range for this run")
             else:
                 raise Exception(f"Unable to parse file name: {i.name}")
 
-        return self.run_tasks(self.download_item, task_list)
+        return task_list
 
 
-    def download_data(self, **kwargs):
+    def prepare_download(self, **kwargs):
         """
-        Downloads data from the Box shared folder for this dataset.
-
-        kwargs are passed to download_items
+        Generates a task list of downloads from the Box shared folder for this dataset.
         """
 
         # load JWT authentication JSON (see README.md for how to set this up)
@@ -192,11 +192,13 @@ class PM25(Dataset):
         elif not monthly_item:
             raise KeyError("Could not find directory \"Global/Monthly\" in shared Box folder")
 
-        # download Annual files
-        self.download_folder(annual_item, "input_data/Annual/", **kwargs)
+        # generate Annual tasks
+        annual_tasks = self.tasks_from_folder(annual_item, "input_data/Annual/", **kwargs)
 
-        # download Monthly files
-        self.download_folder(monthly_item, "input_data/Monthly/", **kwargs)
+        # generate Monthly tasks
+        monthly_tasks = self.tasks_from_folder(monthly_item, "input_data/Monthly/", **kwargs)
+
+        return annual_tasks + monthly_tasks
 
 
     def convert_file(self, input_path, output_path):
@@ -281,7 +283,8 @@ class PM25(Dataset):
         logger = self.get_logger()
 
         logger.info("Downloading / Verifying Data")
-        self.download_data(skip_existing=self.skip_existing_downloads, verify_existing=self.verify_existing_downloads)
+        download_tasks = self.prepare_download(skip_existing=self.skip_existing_downloads, verify_existing=self.verify_existing_downloads)
+        self.run_tasks(download_item, download_tasks)
 
         logger.info("Generating Task List")
         conv_flist = self.build_process_list()
@@ -317,7 +320,7 @@ def get_config_dict(config_file="config.ini"):
 if __name__ == "__main__":
     raw_dir = Path(os.getcwd(), "input_data")
     output_dir = Path(os.getcwd(), "output_data")
-    # box_config_path = "box_login_config.json"
+    box_config_path = "box_login_config.json"
 
     # year_list = range(1998, 2021)
     year_list = range(1998, 1999)
