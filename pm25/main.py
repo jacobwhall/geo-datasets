@@ -95,8 +95,12 @@ class PM25(Dataset):
 
         self.filename_template = "V5GL02.HybridPM25.Global.{YEAR}{FIRST_MONTH}-{YEAR}{LAST_MONTH}"
 
+    def download_item(self, item, dst):
 
-    def download_items(self,
+        with open(dst_file, "wb") as dst:
+            i.download_to(dst)
+
+    def download_folder(self,
                        box_folder,
                        dst_folder,
                        skip_existing=True,
@@ -112,9 +116,10 @@ class PM25(Dataset):
 
         logger = self.get_logger()
 
+        dst_folder = Path(dst_folder)
         os.makedirs(dst_folder, exist_ok=True)
 
-        successful_downloads = []
+        task_list = []
 
         for i in box_folder.get_items():
             file_timeframe = i.name.split(".")[3].split("-")
@@ -123,6 +128,7 @@ class PM25(Dataset):
                 second_year = str(file_timeframe[1])[:4]
                 if first_year == second_year and int(first_year) in self.years:
                     
+
                     dst_file = os.path.join(dst_folder, i.name)
 
                     if skip_existing and os.path.isfile(dst_file):
@@ -136,19 +142,15 @@ class PM25(Dataset):
                             logger.info(f"File already downloaded, skipping: {dst_file}")
                             continue
                     else:
-                        logger.info(f"Downloading: {dst_file}")
-
-                        with open(dst_file, "wb") as dst:
-                            i.download_to(dst)
-
-                    successful_downloads.append(dst_file)
+                        logger.info(f"Queued for download: {dst_file}")
+                        task_list.append([i, dst_folder / i.name])
 
                 else:
                     logger.debug(f"Skipping {i.name}, year not in range for this run")
             else:
                 raise Exception(f"Unable to parse file name: {i.name}")
 
-        return successful_downloads
+        return self.run_tasks(self.download_item, task_list)
 
 
     def download_data(self, **kwargs):
@@ -190,10 +192,10 @@ class PM25(Dataset):
             raise KeyError("Could not find directory \"Global/Monthly\" in shared Box folder")
 
         # download Annual files
-        self.download_items(annual_item, "input_data/Annual/", **kwargs)
+        self.download_folder(annual_item, "input_data/Annual/", **kwargs)
 
         # download Monthly files
-        self.download_items(monthly_item, "input_data/Monthly/", **kwargs)
+        self.download_folder(monthly_item, "input_data/Monthly/", **kwargs)
 
 
     def convert_file(self, input_path, output_path):
@@ -297,6 +299,7 @@ if __name__ == "__main__":
     output_dir = Path(os.getcwd(), "output_data")
     box_config_path = "box_login_config.json"
 
-    year_list = range(1998, 2021)
+    # year_list = range(1998, 2021)
+    year_list = range(1998, 1999)
 
-    PM25(raw_dir, output_dir, box_config_path, year_list, skip_existing_downloads=True, verify_existing_downloads=False).run()
+    PM25(raw_dir, output_dir, box_config_path, year_list, skip_existing_downloads=False, verify_existing_downloads=False).run(task_runner="concurrent")
