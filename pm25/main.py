@@ -8,6 +8,7 @@ import hashlib
 import datetime
 import warnings
 from pathlib import Path
+from configparser import ConfigParser
 
 import rasterio
 import numpy as np
@@ -290,6 +291,25 @@ class PM25(Dataset):
         logger.info("Running Data Conversion")
         conv = self.run_tasks(self.convert_file, conv_flist)
         self.log_run(conv)
+
+
+def get_config_dict(config_file="config.ini"):
+    config = ConfigParser()
+    config.read(config_file)
+
+    return {
+        "raw_dir" Path(config["main"]["raw_dir"]),
+        "output_dir": Path(config["main"]["output_dir"]),
+        "years": [int(y) for y in config["main"]["years"].split(", ")],
+        "box_config_path": Path(config["main"]["box_config_path"]),
+        "skip_existing_downloads": config["main"].getboolean("skip_existing_downloads"),
+        "verify_existing_downloads": config["main"].getboolean("verify_existing_downloads"),
+        "backend": config["run"]["backend"],
+        "task_runner": config["run"]["task_runner"],
+        "run_parallel": config["run"].getboolean("run_parallel"),
+        "max_workers": int(config["run"]["max_workers"]),
+        "log_dir": Path(config["main"]["raw_dir"]) / "logs",
+    }
 
 
 if __name__ == "__main__":
