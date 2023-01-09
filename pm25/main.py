@@ -244,7 +244,7 @@ class PM25(Dataset):
         output_path_list = []
         
         # run annual data
-        for year in year_list:
+        for year in self.years:
             filename = self.filename_template.format(YEAR = year, FIRST_MONTH = "01", LAST_MONTH = "12")
             input_path = self.raw_dir / "Annual" / (filename + ".nc")
             if os.path.exists(input_path):
@@ -256,7 +256,7 @@ class PM25(Dataset):
 
         # run monthly data
         # TODO: find a way to set each year's month range individually so if researcher wants different months for each year can adjust
-        for year in year_list:
+        for year in self.years:
             for i in range(1, 13):
                 month = str(i).zfill(2)
                 filename = self.filename_template.format(YEAR = year, FIRST_MONTH = month, LAST_MONTH = month)
