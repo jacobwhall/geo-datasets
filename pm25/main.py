@@ -308,11 +308,6 @@ def get_config_dict(config_file="config.ini"):
 
 
 if __name__ == "__main__":
-    raw_dir = Path(os.getcwd(), "input_data")
-    output_dir = Path(os.getcwd(), "output_data")
-    box_config_path = "box_login_config.json"
+    config = get_config_dict()
 
-    # year_list = range(1998, 2021)
-    year_list = range(1998, 1999)
-
-    PM25(raw_dir, output_dir, box_config_path, year_list, skip_existing_downloads=False, verify_existing_downloads=False).run(task_runner="concurrent")
+    PM25(config["raw_dir"], config["output_dir"], config["box_config_path"], config["years"], config["skip_existing_downloads"], config["verify_existing_downloads"]).run(backend=config["backend"], task_runner=config["task_runner"], run_parallel=config["run_parallel"], max_workers=config["max_workers"], log_dir=config["log_dir"])
