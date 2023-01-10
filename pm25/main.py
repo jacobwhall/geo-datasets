@@ -143,8 +143,6 @@ class PM25(Dataset):
                         logger.info(f"Downloading: {dst_file}")
                         with open(dst_folder / i.name, "wb") as dst:
                             i.download_to(dst)
-
-
                 else:
                     logger.debug(f"Skipping {i.name}, year not in range for this run")
             else:
@@ -188,10 +186,10 @@ class PM25(Dataset):
             raise KeyError("Could not find directory \"Global/Monthly\" in shared Box folder")
 
         # generate Annual tasks
-        self.download_folder(annual_item, "input_data/Annual/", **kwargs)
+        self.download_folder(annual_item, self.raw_dir / "Annual", **kwargs)
 
         # generate Monthly tasks
-        self.download_folder(monthly_item, "input_data/Monthly/", **kwargs)
+        self.download_folder(monthly_item, self.raw_dir / "Monthly", **kwargs)
 
 
     def convert_file(self, input_path, output_path):
