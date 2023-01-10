@@ -261,6 +261,8 @@ class PM25(Dataset):
                 month = str(i).zfill(2)
                 filename = self.filename_template.format(YEAR = year, FIRST_MONTH = month, LAST_MONTH = month)
                 input_path = self.raw_dir / "Monthly" / (filename + ".nc")
+                logger = self.get_logger()
+                logger.info(str(input_path))
                 if os.path.exists(input_path):
                     input_path_list.append(input_path)
                     output_path = self.output_dir / "Monthly" / (filename + ".tif")
