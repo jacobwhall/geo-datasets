@@ -34,7 +34,7 @@ def pm25(raw_dir, output_dir, box_config_path, years, skip_existing_downloads, v
         "shebang": "#!/bin/tcsh",
         "resource_spec": "nodes=1:c18a:ppn=12",
         "cores": 6,
-        "processes": 6,
+        "processes": 2,
         "memory": "32GB",
         "interface": "ib0",
         "job_extra_directives": [
