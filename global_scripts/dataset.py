@@ -9,6 +9,9 @@ from datetime import datetime
 from collections import namedtuple
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from contextlib import contextmanager
+
+from run_config import validate_retries, validate_retry_delay
 
 
 """
@@ -70,6 +73,15 @@ class Dataset(ABC):
         """
         raise NotImplementedError("Dataset classes must implement a main function")
 
+    @contextmanager
+    def custom_retries(retries: int, retry_delay: int):
+        # Validate parameters, save global retry settings, and override with current values
+        old_retries = validate_retries(retries)
+        old_retry_delay = validate_retry_delay(retry_delay)
+        self.retries, self.retry_delay = retries, retry_delay
+        yield
+        # Restore original values
+        self.retries, self.retry_delay = old_retries, old_retry_delay
 
     def get_logger(self):
         """
@@ -206,44 +218,38 @@ class Dataset(ABC):
         if not callable(func):
             raise TypeError("Function passed to run_tasks is not callable")
 
-        # Save global retry settings, and override with current values
-        old_retries, old_retry_delay = self.retries, self.retry_delay
-        self.retries, self.retry_delay = self.init_retries(retries, retry_delay)
+        with custom_retries(retries, retry_delay):
+            logger = self.get_logger()
 
-        logger = self.get_logger()
+            if name is None:
+                try:
+                    name = func.__name__
+                except AttributeError:
+                    logger.warning("No name given for task run, and function does not have a name (multiple unnamed functions may result in log files being overwritten)")
+                    name = "unnamed"
+            elif not isinstance(name, str):
+                raise TypeError("Name of task run must be a string")
 
-        if name is None:
-            try:
-                name = func.__name__
-            except AttributeError:
-                logger.warning("No name given for task run, and function does not have a name (multiple unnamed functions may result in log files being overwritten)")
-                name = "unnamed"
-        elif not isinstance(name, str):
-            raise TypeError("Name of task run must be a string")
+            if self.backend == "serial":
+                results = self.run_serial_tasks(name, func, input_list)
+            elif self.backend == "concurrent":
+                results = self.run_concurrent_tasks(name, func, input_list)
+            elif self.backend == "prefect":
+                results = self.run_prefect_tasks(name, func, input_list)
+            elif self.backend == "mpi":
+                results = self.run_mpi_tasks(name, func, input_list)
+            else:
+                raise ValueError("Requested backend not recognized. Have you called this Dataset's run function?")
 
-        if self.backend == "serial":
-            results = self.run_serial_tasks(name, func, input_list)
-        elif self.backend == "concurrent":
-            results = self.run_concurrent_tasks(name, func, input_list)
-        elif self.backend == "prefect":
-            results = self.run_prefect_tasks(name, func, input_list)
-        elif self.backend == "mpi":
-            results = self.run_mpi_tasks(name, func, input_list)
-        else:
-            raise ValueError("Requested backend not recognized. Have you called this Dataset's run function?")
+            if len(results) == 0:
+                raise ValueError(f"Task run {name} yielded no results. Did it receive any inputs?")
 
-        if len(results) == 0:
-            raise ValueError(f"Task run {name} yielded no results. Did it receive any inputs?")
-
-        success_count = sum(1 for r in results if r.status_code == 0)
-        error_count = len(results) - success_count
-        if error_count == 0:
-            logger.info(f"Task run {name} completed with {success_count} successes and no errors")
-        else:
-            logger.warning(f"Task run {name} completed with {error_count} errors and {success_count} successes")
-
-        # Restore global retry settings
-        self.retries, self.retry_delay = old_retries, old_retry_delay
+            success_count = sum(1 for r in results if r.status_code == 0)
+            error_count = len(results) - success_count
+            if error_count == 0:
+                logger.info(f"Task run {name} completed with {success_count} successes and no errors")
+            else:
+                logger.warning(f"Task run {name} completed with {error_count} errors and {success_count} successes")
 
         return ResultTuple(results, name, timestamp)
 
@@ -357,6 +363,7 @@ class Dataset(ABC):
         logger_level=logging.INFO,
         retries: int=3,
         retry_delay: int=5,
+        dont_start_flow: bool=False
         **kwargs):
         """
         Run a dataset
@@ -368,7 +375,6 @@ class Dataset(ABC):
 
         self.log_dir = Path(log_dir)
         self.chunksize = chunksize
-        os.makedirs(self.log_dir, exist_ok=True)
 
         # Allow datasets to set their own default max_workers
         if max_workers is None and hasattr(self, "max_workers"):
@@ -381,32 +387,36 @@ class Dataset(ABC):
         if backend == "prefect":
             self.backend = "prefect"
 
-            from prefect import flow
-            from prefect.task_runners import SequentialTaskRunner, ConcurrentTaskRunner
+            if not dont_start_flow:
 
-            if task_runner == "sequential":
-                tr = SequentialTaskRunner
-            elif task_runner == "concurrent" or task_runner is None:
-                tr = ConcurrentTaskRunner
-            elif task_runner == "dask":
-                from prefect_dask import DaskTaskRunner
-                if "cluster" in kwargs:
-                    del kwargs["cluster"]
-                if "cluster_kwargs" in kwargs:
-                    del kwargs["cluster_kwargs"]
-                tr = DaskTaskRunner(**kwargs)
-            elif task_runner == "hpc":
-                from hpc import HPCDaskTaskRunner
-                job_name = "".join(self.name.split())
-                tr = HPCDaskTaskRunner(num_procs=max_workers, job_name=job_name, log_dir=self.log_dir, **kwargs)
+                from prefect import flow
+                from prefect.task_runners import SequentialTaskRunner, ConcurrentTaskRunner
+
+                if task_runner == "sequential":
+                    tr = SequentialTaskRunner
+                elif task_runner == "concurrent" or task_runner is None:
+                    tr = ConcurrentTaskRunner
+                elif task_runner == "dask":
+                    from prefect_dask import DaskTaskRunner
+                    if "cluster" in kwargs:
+                        del kwargs["cluster"]
+                    if "cluster_kwargs" in kwargs:
+                        del kwargs["cluster_kwargs"]
+                    tr = DaskTaskRunner(**kwargs)
+                elif task_runner == "hpc":
+                    from hpc import HPCDaskTaskRunner
+                    job_name = "".join(self.name.split())
+                    tr = HPCDaskTaskRunner(num_procs=max_workers, job_name=job_name, log_dir=self.log_dir, **kwargs)
+                else:
+                    raise ValueError("Prefect task runner not recognized")
+
+                @flow(task_runner=tr, name=self.name)
+                def prefect_main_wrapper():
+                    self.main()
+
+                prefect_main_wrapper()
             else:
-                raise ValueError("Prefect task runner not recognized")
-
-            @flow(task_runner=tr, name=self.name)
-            def prefect_main_wrapper():
                 self.main()
-
-            prefect_main_wrapper()
 
         else:
             logger = logging.getLogger("dataset")
