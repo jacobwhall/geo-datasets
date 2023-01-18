@@ -363,7 +363,7 @@ class Dataset(ABC):
         logger_level=logging.INFO,
         retries: int=3,
         retry_delay: int=5,
-        dont_start_flow: bool=False
+        dont_start_flow: bool=False,
         **kwargs):
         """
         Run a dataset

@@ -231,6 +231,13 @@ def get_config_dict(config_file="config.ini"):
         "output_dir": Path(config["main"]["output_dir"]),
         "overwrite_download": config["main"].getboolean("overwrite_download"),
         "overwrite_processing": config["main"].getboolean("overwrite_processing"),
+    }
+
+def get_default_run_dict(config_file="config.ini"):
+    config = ConfigParser()
+    config.read(config_file)
+
+    return {
         "backend": config["run"]["backend"],
         "task_runner": config["run"]["task_runner"],
         "run_parallel": config["run"].getboolean("run_parallel"),
@@ -242,6 +249,7 @@ def get_config_dict(config_file="config.ini"):
 if __name__ == "__main__":
 
     config_dict = get_config_dict()
+    run_dict = get_default_run_dict()
 
     log_dir = config_dict["log_dir"]
     timestamp = datetime.today()
@@ -253,4 +261,4 @@ if __name__ == "__main__":
 
     class_instance = MalariaAtlasProject(config_dict["raw_dir"], config_dict["output_dir"], config_dict["years"], config_dict["dataset"], config_dict["overwrite_download"], config_dict["overwrite_processing"])
 
-    class_instance.run(backend=config_dict["backend"], task_runner=config_dict["task_runner"], run_parallel=config_dict["run_parallel"], max_workers=config_dict["max_workers"], log_dir=timestamp_log_dir)
+    class_instance.run(backend=run_dict["backend"], task_runner=run_dict["task_runner"], run_parallel=run_dict["run_parallel"], max_workers=run_dict["max_workers"], log_dir=timestamp_log_dir)

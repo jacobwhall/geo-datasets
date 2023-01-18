@@ -1,5 +1,6 @@
+import os
 import logging
-from typing import Optional
+from typing import Optional, Union
 from pathlib import Path
 
 from pydantic import BaseModel, validator
@@ -26,7 +27,7 @@ class RunConfig(BaseModel):
     run_parallel: Optional[bool]
     max_workers: Optional[int]
     chunksize: Optional[int]
-    log_dir: str = "logs"
+    log_dir: Union[Path, str] = "logs"
     logger_level: int = logging.INFO
     retries: int = 3
     retry_delay: int = 5

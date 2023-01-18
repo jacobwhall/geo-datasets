@@ -25,11 +25,14 @@ prefect agent start -q 'work_queue_name'
 
 import sys
 import os
+from pathlib import Path
 from configparser import ConfigParser
 
 from prefect.deployments import Deployment
 from prefect.filesystems import GitHub
 
+from run_config import RunConfig
+from flow import start_run
 
 
 if len(sys.argv) != 2:
@@ -40,11 +43,17 @@ dataset_dir = sys.argv[1].strip("/")
 if dataset_dir not in os.listdir(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))):
     raise Exception("dataset directory provided not found in current directory")
 
+dataset_path = Path(__file__).parent.parent / dataset_dir
 
-sys.path.insert(1, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), dataset_dir))
+sys.path.insert(1, dataset_path.as_posix())
 
-from main import get_config_dict
+from main import get_config_dict, get_default_run_dict
 
+default_parameters = {
+    "dataset_path": dataset_path,
+    "run_config": RunConfig(**get_default_run_dict(dataset_path / "config.ini")),
+    "dataset_config": get_config_dict(dataset_path / "config.ini"),
+}
 
 config_file = dataset_dir + "/config.ini"
 config = ConfigParser()
@@ -73,20 +82,12 @@ block.save(block_name, overwrite=True)
 
 # -------------------------------------
 
-def flow_import(module_name, flow_name):
-    module = __import__(module_name)
-    import_flow = getattr(module, flow_name)
-    return import_flow
-
-# Driver Code
-flow = flow_import(module_name, flow_name)
-
 # # load a pre-defined block and specify a subfolder of repo
 storage = GitHub.load(block_name)#.get_directory(block_repo_dir)
 
 # build deployment
 deployment = Deployment.build_from_flow(
-    flow=flow,
+    flow=start_run,
     name=config["deploy"]["deployment_name"],
     version=config["deploy"]["version"],
     # work_queue_name="geo-datasets",
@@ -94,7 +95,7 @@ deployment = Deployment.build_from_flow(
     storage=storage,
     path=block_repo_dir,
     # skip_upload=True,
-    parameters=get_config_dict(config_file),
+    parameters=default_parameters,
     apply=True
 )
 
