@@ -32,6 +32,7 @@ class RunConfig(BaseModel):
     retries: int = 3
     retry_delay: int = 5
     dask_kwargs: Optional[dict]
+    dont_start_flow: Optional[bool] = False
 
     @validator("backend")
     def validate_backend(cls, v):
@@ -39,6 +40,7 @@ class RunConfig(BaseModel):
             raise ValueError(f"Backend not recognized: {v}")
         return v
 
+    """
     @validator("task_runner")
     def validate_task_runner(cls, v, values):
         if values["backend"] == "prefect":
@@ -54,6 +56,7 @@ class RunConfig(BaseModel):
                 raise ValueError(f"Task runner not recognized: {v}")
         elif v is not None:
             return None # TODO: raise ValueError in this case?
+    """
 
     @validator("run_parallel")
     def validate_run_parallel(cls, v, values):
@@ -106,4 +109,3 @@ class RunConfig(BaseModel):
         elif values["task_runner"] != "hpc":
             return None
         return v
-                

@@ -5,18 +5,30 @@ from inspect import getmembers, isclass, signature
 
 from prefect import Flow
 from prefect.filesystems import GitHub
+from prefect.task_runners import ConcurrentTaskRunner, SequentialTaskRunner
 
 from run_config import RunConfig
-
+                
 
 class DatasetFlow(Flow):
-    def _run(self, *args, **kwargs):
-        print("_run was...ran!")
-        super()._run(*args, **kwargs)
 
-    def __call__(self, *args, **kwargs):
-        print("__call__ was...called!")
-        super().__call__(*args, **kwargs)
+    def __call__(self, dataset_path, run_config, dataset_config):
+        
+        if run_config.backend == "prefect":
+            if run_config.task_runner == "concurrent":
+                self.task_runner = ConcurrentTaskRunner()
+            elif run_config.task_runner in ["dask", "hpc"]:
+                from prefect_dask import DaskTaskRunner
+                # TODO: add dask kwargs here
+                self.task_runner = DaskTaskRunner()
+            elif run_config.task_runner == "sequential":
+                self.task_runner = SequentialTaskRunner()
+            else:
+                raise ValueError(f"Task runner not recognized: {v}")
+
+        run_config.dont_start_flow = True
+
+        super().__call__(dataset_path, run_config, dataset_config)
 
 
 is_dataset_class = lambda m: isclass(m[1]) and issubclass(m[1]) and m[0] != "Dataset"
