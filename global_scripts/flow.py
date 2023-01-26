@@ -56,6 +56,10 @@ def start_run(dataset_path: Union[str, Path],
     logger.info("Inserting dataset directory into sys.path...")
     sys.path.insert(1, (Path(__file__).parent / dataset_dir).as_posix)
 
+    logger.info(repr(sys.path))
+    for p in sys.path:
+        logger.info(p)
+
     # import main module from dataset
     logger.info("Importing dataset main file...")
     import main
