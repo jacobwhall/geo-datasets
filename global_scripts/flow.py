@@ -32,8 +32,6 @@ class DatasetFlow(Flow):
         super().__call__(dataset_path, run_config, dataset_config)
 
 
-is_dataset_class = lambda m: isclass(m[1]) and issubclass(m[1]) and m[0] != "Dataset"
-
 default_run_config = RunConfig(backend="prefect", task_runner="hpc", max_workers=6)
 
 @DatasetFlow
@@ -56,13 +54,12 @@ def start_run(dataset_path: Union[str, Path],
     logger.info("Inserting dataset directory into sys.path...")
     sys.path.insert(1, (Path(__file__).parent.parent / dataset_dir).as_posix())
 
-    logger.info(repr(sys.path))
-    for p in sys.path:
-        logger.info(p)
-
     # import main module from dataset
     logger.info("Importing dataset main file...")
     import main
+
+    from dataset import Dataset
+    is_dataset_class = lambda m: isclass(m[1]) and issubclass(m[1], Dataset) and m[0] != "Dataset"
 
     # find dataset function in module main
     try:
