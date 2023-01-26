@@ -38,8 +38,8 @@ default_run_config = RunConfig(backend="prefect", task_runner="hpc", max_workers
 @DatasetFlow
 def start_run(dataset_path: Union[str, Path],
               storage_block_name: str,
-              run_config: RunConfig=default_run_config,
-              dataset_config: dict):
+              dataset_config: dict,
+              run_config: RunConfig=default_run_config):
     logger = get_run_logger()
 
     # determine name of dataset directory
