@@ -83,7 +83,7 @@ block.save(block_name, overwrite=True)
 # -------------------------------------
 
 # # load a pre-defined block and specify a subfolder of repo
-storage = GitHub.load(block_name).get_directory("global_scripts")
+storage = GitHub.load(block_name)# .get_directory("global_scripts")
 
 # build deployment
 deployment = Deployment.build_from_flow(
