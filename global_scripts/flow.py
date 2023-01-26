@@ -45,7 +45,7 @@ def start_run(dataset_path: Union[str, Path],
     logger.info(f"Starting run of {dataset_dir}")
 
     # load dataset directory from GitHub storage block
-    logger.info("Loading datset directory...")
+    logger.info("Loading dataset directory...")
     GitHub.load(storage_block_name).get_directory(dataset_dir)
 
     # add dataset directory to sys.path
@@ -68,8 +68,6 @@ def start_run(dataset_path: Union[str, Path],
     # create instance of dataset class
     logger.info("Creating instance of dataset class")
     class_instance = dataset_class(**dataset_config)
-
-    run_config.dont_start_flow = True
 
     # run dataset class with run config
     logger.info("Running dataset class instance")
