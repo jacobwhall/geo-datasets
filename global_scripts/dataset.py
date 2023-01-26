@@ -74,7 +74,7 @@ class Dataset(ABC):
         raise NotImplementedError("Dataset classes must implement a main function")
 
     @contextmanager
-    def custom_retries(retries: int, retry_delay: int):
+    def custom_retries(self, retries: int, retry_delay: int):
         # Validate parameters, save global retry settings, and override with current values
         old_retries = validate_retries(retries)
         old_retry_delay = validate_retry_delay(retry_delay)
@@ -218,7 +218,7 @@ class Dataset(ABC):
         if not callable(func):
             raise TypeError("Function passed to run_tasks is not callable")
 
-        with custom_retries(retries, retry_delay):
+        with self.custom_retries(retries, retry_delay):
             logger = self.get_logger()
 
             if name is None:
