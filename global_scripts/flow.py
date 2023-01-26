@@ -73,4 +73,4 @@ def start_run(dataset_path: Union[str, Path],
 
     # run dataset class with run config
     logger.info("Running dataset class instance")
-    dataset_class.run(**run_config.dict())
+    class_instance(**run_config.dict())
