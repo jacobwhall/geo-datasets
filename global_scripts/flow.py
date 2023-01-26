@@ -42,6 +42,8 @@ def start_run(dataset_path: Union[str, Path],
     # determine name of dataset directory
     dataset_dir = Path(dataset_path).name
 
+    breakpoint()
+
     # load dataset directory from GitHub storage block
     block_name = dataset_config["deploy"]["storage_block"]
     GitHub.load(block_name).get_directory(dataset_dir)

@@ -77,13 +77,13 @@ block = GitHub(
     reference=block_reference,
     #access_token=<my_access_token> # only required for private repos
 )
-# block.get_directory(block_repo_dir)
+block.get_directory(block_repo_dir)
 block.save(block_name, overwrite=True)
 
 # -------------------------------------
 
 # # load a pre-defined block and specify a subfolder of repo
-storage = GitHub.load(block_name)#.get_directory(block_repo_dir)
+storage = GitHub.load(block_name).get_directory(block_repo_dir)
 
 # build deployment
 deployment = Deployment.build_from_flow(
