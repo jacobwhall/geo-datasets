@@ -71,7 +71,7 @@ block = GitHub(
     reference=block_reference,
     #access_token=<my_access_token> # only required for private repos
 )
-block.get_directory("global_scripts")
+
 block.save(block_name, overwrite=True)
 
 # -------------------------------------
