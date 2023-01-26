@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Union
 from inspect import getmembers, isclass, signature
 
-from prefect import Flow
+from prefect import Flow, get_run_logger
 from prefect.filesystems import GitHub
 from prefect.task_runners import ConcurrentTaskRunner, SequentialTaskRunner
 
@@ -39,20 +39,24 @@ default_run_config = RunConfig(backend="prefect", task_runner="hpc", max_workers
 def start_run(dataset_path: Union[str, Path],
               run_config: RunConfig=default_run_config,
               dataset_config: dict={}):
+    logger = get_run_logger()
+
     # determine name of dataset directory
     dataset_dir = Path(dataset_path).name
 
-    breakpoint()
+    logger.info(f"Starting run of {dataset_dir}")
 
     # load dataset directory from GitHub storage block
+    logger.info("Loading datset directory...")
     block_name = dataset_config["deploy"]["storage_block"]
     GitHub.load(block_name).get_directory(dataset_dir)
 
     # add dataset directory to sys.path
+    logger.info("Inserting dataset directory into sys.path...")
     sys.path.insert(1, (Path(__file__).parent / dataset_dir).as_posix)
-    print(sys.path)
 
     # import main module from dataset
+    logger.info("Importing dataset main file...")
     import main
 
     # find dataset function in module main
@@ -62,7 +66,9 @@ def start_run(dataset_path: Union[str, Path],
         raise ValueError("No dataset class found in module main")
 
     # create instance of dataset class
+    logger.info("Creating instance of dataset class")
     class_instance = dataset_class(**dataset_config)
 
     # run dataset class with run config
+    logger.info("Running dataset class instance")
     dataset_class.run(**run_config.dict())
