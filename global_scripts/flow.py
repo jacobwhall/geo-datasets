@@ -27,8 +27,6 @@ class DatasetFlow(Flow):
             else:
                 raise ValueError(f"Task runner not recognized: {v}")
 
-        run_config.dont_start_flow = True
-
         super().__call__(dataset_path, run_config, dataset_config)
 
 
@@ -70,6 +68,8 @@ def start_run(dataset_path: Union[str, Path],
     # create instance of dataset class
     logger.info("Creating instance of dataset class")
     class_instance = dataset_class(**dataset_config)
+
+    run_config.dont_start_flow = True
 
     # run dataset class with run config
     logger.info("Running dataset class instance")

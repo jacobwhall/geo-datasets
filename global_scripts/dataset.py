@@ -387,8 +387,9 @@ class Dataset(ABC):
         if backend == "prefect":
             self.backend = "prefect"
 
-            if not dont_start_flow:
-
+            if dont_start_flow:
+                self.main()
+            else:
                 from prefect import flow
                 from prefect.task_runners import SequentialTaskRunner, ConcurrentTaskRunner
 
@@ -415,8 +416,6 @@ class Dataset(ABC):
                     self.main()
 
                 prefect_main_wrapper()
-            else:
-                self.main()
 
         else:
             logger = logging.getLogger("dataset")
