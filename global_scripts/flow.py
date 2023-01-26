@@ -37,8 +37,9 @@ default_run_config = RunConfig(backend="prefect", task_runner="hpc", max_workers
 
 @DatasetFlow
 def start_run(dataset_path: Union[str, Path],
+              storage_block_name: str,
               run_config: RunConfig=default_run_config,
-              dataset_config: dict={}):
+              dataset_config: dict):
     logger = get_run_logger()
 
     # determine name of dataset directory
@@ -48,8 +49,7 @@ def start_run(dataset_path: Union[str, Path],
 
     # load dataset directory from GitHub storage block
     logger.info("Loading datset directory...")
-    block_name = dataset_config["deploy"]["storage_block"]
-    GitHub.load(block_name).get_directory(dataset_dir)
+    GitHub.load(storage_block_name).get_directory(dataset_dir)
 
     # add dataset directory to sys.path
     logger.info("Inserting dataset directory into sys.path...")

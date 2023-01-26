@@ -49,12 +49,6 @@ sys.path.insert(1, dataset_path.as_posix())
 
 from main import get_config_dict, get_default_run_dict
 
-default_parameters = {
-    "dataset_path": dataset_path,
-    "run_config": RunConfig(**get_default_run_dict(dataset_path / "config.ini")),
-    "dataset_config": get_config_dict(dataset_path / "config.ini"),
-}
-
 config_file = dataset_dir + "/config.ini"
 config = ConfigParser()
 config.read(config_file)
@@ -82,8 +76,15 @@ block.save(block_name, overwrite=True)
 
 # -------------------------------------
 
+default_parameters = {
+    "dataset_path": dataset_path,
+    "storage_block_name": block_name,
+    "run_config": RunConfig(**get_default_run_dict(dataset_path / "config.ini")),
+    "dataset_config": get_config_dict(dataset_path / "config.ini"),
+}
+
 # # load a pre-defined block and specify a subfolder of repo
-storage = GitHub.load(block_name)# .get_directory("global_scripts")
+storage = GitHub.load(block_name)
 
 # build deployment
 deployment = Deployment.build_from_flow(
