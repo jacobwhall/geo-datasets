@@ -5,8 +5,8 @@ import os
 import sys
 import hashlib
 import warnings
-from datetime import datetime
 from pathlib import Path
+from datetime import datetime
 from configparser import ConfigParser
 
 import rasterio
@@ -65,19 +65,6 @@ def sha1(filename):
     return h.hexdigest()
 
 
-def create_box_client(box_config_path):
-    """
-    Creates a Box client using the provided JWT authentication JSON.
-    """
-
-    # load JWT authentication JSON (see README.md for how to set this up)
-    auth = JWTAuth.from_settings_file(box_config_path)
-
-    # create Box client
-    client = Client(auth)
-
-    return client
-
 
 class PM25(Dataset):
     name = "Surface PM2.5"
@@ -108,16 +95,31 @@ class PM25(Dataset):
 
         self.filename_template = "V5GL02.HybridPM25.Global.{YEAR}{FIRST_MONTH}-{YEAR}{LAST_MONTH}"
 
+    
+    def box_client(self):
+        """
+        Creates a Box client using the provided JWT authentication JSON.
+        """
+
+        # load JWT authentication JSON (see README.md for how to set this up)
+        auth = JWTAuth.from_settings_file(self.box_config_path)
+
+        # create Box client
+        client = Client(auth)
+
+        return client
+        # del client
+
 
     def build_folder_download_list(self):
         """
         Generates a task list of downloads from the Box shared folder for this dataset.
         """
-        # create Box client
-        self.client = create_box_client(self.box_config_path)
+        
+        client = self.box_client()
 
         # find shared folder
-        shared_folder = self.client.get_shared_item("https://wustl.app.box.com/v/ACAG-V5GL02-GWRPM25")
+        shared_folder = client.get_shared_item("https://wustl.app.box.com/v/ACAG-V5GL02-GWRPM25")
 
         # find Global folder
         for i in shared_folder.get_items():
@@ -141,8 +143,6 @@ class PM25(Dataset):
         elif not monthly_item:
             raise KeyError("Could not find directory \"Global/Monthly\" in shared Box folder")
 
-        del self.client
-
         return [annual_item, monthly_item]
 
 
@@ -152,19 +152,20 @@ class PM25(Dataset):
 
         annual_item, monthly_item = self.build_folder_download_list()
 
-        annual_item_list = [(i, self.raw_dir / "Global" / "Annual" / i.name) for i in annual_item.get_items()]
-        monthly_item_list = [(i, self.raw_dir / "Global" / "Monthly" / i.name) for i in monthly_item.get_items()]
+        annual_item_list = [(i.id, self.raw_dir / "Global" / "Annual" / i.name) for i in annual_item.get_items()]
+        monthly_item_list = [(i.id, self.raw_dir / "Global" / "Monthly" / i.name) for i in monthly_item.get_items()]
 
         download_item_list = annual_item_list + monthly_item_list
 
         return download_item_list
 
 
-    def download_file(self, item, dst_file):
-
-        # client = create_box_client(self.box_config_path)
+    def download_file(self, item_id, dst_file):
 
         logger = self.get_logger()
+        
+        client = self.box_client()
+        item = client.file(item_id).get()
 
         file_timeframe = item.name.split(".")[3].split("-")
         if len(file_timeframe) == 2:
@@ -184,8 +185,8 @@ class PM25(Dataset):
                         logger.info(f"File already downloaded, skipping: {dst_file}")
                 else:
                     logger.info(f"Downloading: {dst_file}")
-                    # with open(dst_file, "wb") as dst:
-                    #     item.download_to(dst)
+                    with open(dst_file, "wb") as dst:
+                        item.download_to(dst)
 
             else:
                 logger.debug(f"Skipping {item.name}, year not in range for this run")
@@ -332,6 +333,6 @@ if __name__ == "__main__":
     timestamp_log_dir.mkdir(parents=True, exist_ok=True)
 
 
-    class_instance = PM25(config_dict["raw_dir"], config_dict["output_dir"], config_dict["box_config_dict_path"], config_dict["years"], config_dict["skip_existing_downloads"], config_dict["verify_existing_downloads"])
+    class_instance = PM25(config_dict["raw_dir"], config_dict["output_dir"], config_dict["box_config_path"], config_dict["years"], config_dict["skip_existing_downloads"], config_dict["verify_existing_downloads"])
 
     class_instance.run(backend=config_dict["backend"], task_runner=config_dict["task_runner"], run_parallel=config_dict["run_parallel"], max_workers=config_dict["max_workers"], log_dir=timestamp_log_dir)
