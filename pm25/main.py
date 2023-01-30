@@ -75,7 +75,8 @@ class PM25(Dataset):
                  box_config_path: str,
                  years: list,
                  skip_existing_downloads=True,
-                 verify_existing_downloads=True):
+                 verify_existing_downloads=True,
+                 overwrite_processing=False,):
 
         self.raw_dir = Path(raw_dir)
         self.output_dir = Path(output_dir)
@@ -91,7 +92,7 @@ class PM25(Dataset):
         # (skip_existing_downloads must also be set to True)
         self.verify_existing_downloads = verify_existing_downloads
 
-        self.overwrite = False
+        self.overwrite_processing = overwrite_processing
 
         self.filename_template = "V5GL02.HybridPM25.Global.{YEAR}{FIRST_MONTH}-{YEAR}{LAST_MONTH}"
 
@@ -199,8 +200,9 @@ class PM25(Dataset):
         # Converts nc file to tiff file
 
         logger = self.get_logger()
+        logger.info(f"Converting file: {input_path}")
 
-        if output_path.exists() and not self.overwrite:
+        if output_path.exists() and not self.overwrite_processing:
             logger.info(f"File already converted, skipping: {output_path}")
         else:
             rootgrp = NCDFDataset(input_path, "r", format="NETCDF4")
@@ -241,17 +243,15 @@ class PM25(Dataset):
 
     def build_process_list(self):
 
-        input_path_list = []
-        output_path_list = []
+        task_list = []
 
         # run annual data
         for year in self.years:
             filename = self.filename_template.format(YEAR = year, FIRST_MONTH = "01", LAST_MONTH = "12")
             input_path = self.raw_dir / "Global" / "Annual" / (filename + ".nc")
-            if os.path.exists(input_path):
-                input_path_list.append(input_path)
+            if input_path.exists():
                 output_path = self.output_dir / "Global" / "Annual" / (filename + ".tif")
-                output_path_list.append(output_path)
+                task_list.append((input_path, output_path))
             else:
                 warnings.warn(f"No annual data found for year {year}. Skipping...")
 
@@ -262,14 +262,13 @@ class PM25(Dataset):
                 month = str(i).zfill(2)
                 filename = self.filename_template.format(YEAR = year, FIRST_MONTH = month, LAST_MONTH = month)
                 input_path = self.raw_dir / "Global" / "Monthly" / (filename + ".nc")
-                if os.path.exists(input_path):
-                    input_path_list.append(input_path)
+                if input_path.exists():
                     output_path = self.output_dir / "Global" / "Monthly" / (filename + ".tif")
-                    output_path_list.append(output_path)
+                    task_list.append((input_path, output_path))
                 else:
                     warnings.warn(f"No monthly data found for year {year} month {month}. Skipping...")
 
-        return list(zip(input_path_list, output_path_list))
+        return task_list
 
 
     def main(self):
@@ -284,9 +283,8 @@ class PM25(Dataset):
         (self.raw_dir / "Global" / "Monthly").mkdir(parents=True, exist_ok=True)
 
         logger.info("Downloading Data")
-        dl = self.run_tasks(self.download_file, dl_file_list, force_sequential=True)
+        dl = self.run_tasks(self.download_file, dl_file_list, force_serial=True)
         self.log_run(dl)
-
 
 
         logger.info("Generating Task List")
@@ -294,8 +292,8 @@ class PM25(Dataset):
         logger.info(conv_flist)
 
         # create output directories
-        (self.output_dir / "Annual").mkdir(parents=True, exist_ok=True)
-        (self.output_dir / "Monthly").mkdir(parents=True, exist_ok=True)
+        (self.output_dir / "Global" / "Annual").mkdir(parents=True, exist_ok=True)
+        (self.output_dir / "Global" / "Monthly").mkdir(parents=True, exist_ok=True)
 
         logger.info("Running Data Conversion")
         conv = self.run_tasks(self.convert_file, conv_flist)
@@ -313,6 +311,7 @@ def get_config_dict(config_file="config.ini"):
         "box_config_path": Path(config["main"]["box_config_path"]),
         "skip_existing_downloads": config["main"].getboolean("skip_existing_downloads"),
         "verify_existing_downloads": config["main"].getboolean("verify_existing_downloads"),
+        "overwrite_processing": config["main"].getboolean("overwrite_processing"),
         "backend": config["run"]["backend"],
         "task_runner": config["run"]["task_runner"],
         "run_parallel": config["run"].getboolean("run_parallel"),
@@ -333,6 +332,6 @@ if __name__ == "__main__":
     timestamp_log_dir.mkdir(parents=True, exist_ok=True)
 
 
-    class_instance = PM25(config_dict["raw_dir"], config_dict["output_dir"], config_dict["box_config_path"], config_dict["years"], config_dict["skip_existing_downloads"], config_dict["verify_existing_downloads"])
+    class_instance = PM25(config_dict["raw_dir"], config_dict["output_dir"], config_dict["box_config_path"], config_dict["years"], config_dict["skip_existing_downloads"], config_dict["verify_existing_downloads"], config_dict["overwrite_processing"])
 
     class_instance.run(backend=config_dict["backend"], task_runner=config_dict["task_runner"], run_parallel=config_dict["run_parallel"], max_workers=config_dict["max_workers"], log_dir=timestamp_log_dir)

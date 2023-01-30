@@ -128,7 +128,7 @@ class Dataset(ABC):
 
         from prefect import task
 
-        task_wrapper = task(func, name=name, retries=self.retries, retry_delay_seconds=self.retry_delay)
+        task_wrapper = task(func, name=name, retries=self.retries, retry_delay_seconds=self.retry_delay, persist_result=True)
 
         futures = []
         for i in input_list:
@@ -137,24 +137,46 @@ class Dataset(ABC):
 
         results = []
 
-        for inputs, future in futures:
-            state = future.wait(timeout=None)
-            if state.is_completed():
-                results.append(TaskResult(0, "Success", inputs, state.result()))
-            elif state.is_failed() or state.is_crashed():
-                try:
-                    msg = repr(state.result(raise_on_failure=False))
-                except:
-                    msg = "Unable to retrieve error message"
-                results.append(TaskResult(1, msg, inputs, None))
-            else:
-                pass
+
+        states = [(i[0], i[1].wait()) for i in futures]
+
+        while states:
+            for ix, (inputs, state) in enumerate(states):
+                if state.is_completed():
+                    print('complete', ix, inputs)
+                    results.append(TaskResult(0, "Success", inputs, state.result()))
+                elif state.is_failed() or state.is_crashed() or state.is_cancelled():
+                    print('fail', ix, inputs)
+                    try:
+                        msg = repr(state.result(raise_on_failure=True))
+                    except Exception as e:
+                        msg = f"Unable to retrieve error message - {e}"
+                    results.append(TaskResult(1, msg, inputs, None))
+                else:
+                    # print('not ready', ix, inputs)
+                    continue
+                _ = states.pop(ix)
+            time.sleep(5)
+
+
+        # for inputs, future in futures:
+        #     state = future.wait(60*60*2)
+        #     if state.is_completed():
+        #         results.append(TaskResult(0, "Success", inputs, state.result()))
+        #     elif state.is_failed() or state.is_crashed():
+        #         try:
+        #             msg = repr(state.result(raise_on_failure=False))
+        #         except:
+        #             msg = "Unable to retrieve error message"
+        #         results.append(TaskResult(1, msg, inputs, None))
+        #     else:
+        #         pass
 
         # while futures:
         #     for ix, (inputs, future) in enumerate(futures):
         #         state = future.get_state()
-        #         print(repr(state))
-        #         print(repr(future))
+        #         # print(repr(state))
+        #         # print(repr(future))
         #         if state.is_completed():
         #             print('complete', ix, inputs)
         #             results.append(TaskResult(0, "Success", inputs, future.result()))
@@ -162,15 +184,15 @@ class Dataset(ABC):
         #             print('fail', ix, inputs)
         #             try:
         #                 msg = repr(future.result(raise_on_failure=True))
-        #             except:
-        #                 msg = "Unable to retrieve error message"
+        #             except Exception as e:
+        #                 msg = f"Unable to retrieve error message - {e}"
         #             results.append(TaskResult(1, msg, inputs, None))
         #         else:
-        #             print('not ready', ix, inputs)
+        #             # print('not ready', ix, inputs)
         #             continue
         #         _ = futures.pop(ix)
-        #         future.release()
-        #     time.sleep(15)
+        #         # future.release()
+        #     time.sleep(5)
 
         return results
 
@@ -196,7 +218,8 @@ class Dataset(ABC):
                   name: Optional[str]=None,
                   retries: Optional[int]=3,
                   retry_delay: Optional[int]=60,
-                  force_sequential: bool=False):
+                  force_sequential: bool=False,
+                  force_serial: bool=False):
         """
         Run a bunch of tasks, calling one of the above run_tasks functions
         This is the function that should be called most often from self.main()
@@ -223,7 +246,7 @@ class Dataset(ABC):
         elif not isinstance(name, str):
             raise TypeError("Name of task run must be a string")
 
-        if self.backend == "serial":
+        if self.backend == "serial" or force_serial:
             results = self.run_serial_tasks(name, func, input_list)
         elif self.backend == "concurrent":
             results = self.run_concurrent_tasks(name, func, input_list, force_sequential)
@@ -353,6 +376,7 @@ class Dataset(ABC):
         task_runner: Optional[str]=None,
         run_parallel: bool=False,
         max_workers: Optional[int]=None,
+        threads_per_worker: Optional[int]=1,
         # cores_per_process: Optional[int]=None,
         chunksize: int=1,
         log_dir: str="logs",
@@ -392,11 +416,16 @@ class Dataset(ABC):
                 tr = ConcurrentTaskRunner
             elif task_runner == "dask":
                 from prefect_dask import DaskTaskRunner
-                if "cluster" in kwargs:
-                    del kwargs["cluster"]
-                if "cluster_kwargs" in kwargs:
-                    del kwargs["cluster_kwargs"]
-                tr = DaskTaskRunner(**kwargs)
+                # if "cluster" in kwargs:
+                    # del kwargs["cluster"]
+                # if "cluster_kwargs" in kwargs:
+                    # del kwargs["cluster_kwargs"]
+
+                dask_cluster_kwargs = {
+                    "n_workers": max_workers,
+                    "threads_per_worker": threads_per_worker
+                }
+                tr = DaskTaskRunner(cluster_kwargs=dask_cluster_kwargs)
             elif task_runner == "hpc":
                 from hpc import HPCDaskTaskRunner
                 job_name = "".join(self.name.split())
