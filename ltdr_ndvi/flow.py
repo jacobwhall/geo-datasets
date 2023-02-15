@@ -19,13 +19,12 @@ from main import LTDR_NDVI
 
 tmp_dir = Path(os.getcwd()) / config["github"]["directory"]
 
-
 @flow
 def ltdr_ndvi(
         token: str,
+        years: List[int],
         raw_dir: str,
         output_dir: str,
-        years: List[int],
         overwrite_download: bool,
         validate_download: bool,
         overwrite_processing: bool,
@@ -87,7 +86,7 @@ def ltdr_ndvi(
     #     "log_directory": str(timestamp_log_dir)
     # }
 
-    class_instance = LTDR_NDVI(raw_dir, output_dir, years, dataset, overwrite_download, overwrite_processing)
+    class_instance = LTDR_NDVI(token, years, raw_dir, output_dir, overwrite_download, validate_download, overwrite_processing)
 
     if task_runner != 'hpc':
         os.chdir(tmp_dir)
